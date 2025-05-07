@@ -91,6 +91,11 @@ h1 {
     margin: 0;
 }
 
+/* Styling for wall and ground characters */
+#game-display .game-line {
+    color: #999; /* Default color for map tiles */
+}
+
 .monster-scoreboard {
     flex: 1;
     background-color: #272727;
