@@ -14,16 +14,37 @@ const TILES = {
     ORC: 'o',
     TROLL: 'T',
     SKELETON: 's',
+    DEMON: 'D',
+    DRAGON: 'Δ',
+    WRAITH: 'W',
+    RAT: 'r',
     CHEST: 'C',
-    EXIT: '>'
+    EXIT: '>',
+    SHOP: '$'
 };
 
-// Monster types
+// Monster types - expanded selection with more difficult monsters
 const MONSTER_TYPES = [
-    { type: 'goblin', char: TILES.GOBLIN, health: 15, maxHealth: 15, attack: 3, expValue: 10, color: '#8f8' },
-    { type: 'orc', char: TILES.ORC, health: 25, maxHealth: 25, attack: 5, expValue: 20, color: '#f88' },
-    { type: 'skeleton', char: TILES.SKELETON, health: 20, maxHealth: 20, attack: 4, expValue: 15, color: '#fff' },
-    { type: 'troll', char: TILES.TROLL, health: 40, maxHealth: 40, attack: 8, expValue: 30, color: '#88f' }
+    { type: 'rat', char: TILES.RAT, health: 10, maxHealth: 10, attack: 2, expValue: 5, goldValue: 1, color: '#bb9', minFloor: 1 },
+    { type: 'goblin', char: TILES.GOBLIN, health: 15, maxHealth: 15, attack: 3, expValue: 10, goldValue: 3, color: '#8f8', minFloor: 1 },
+    { type: 'skeleton', char: TILES.SKELETON, health: 20, maxHealth: 20, attack: 4, expValue: 15, goldValue: 5, color: '#fff', minFloor: 2 },
+    { type: 'orc', char: TILES.ORC, health: 25, maxHealth: 25, attack: 5, expValue: 20, goldValue: 8, color: '#f88', minFloor: 3 },
+    { type: 'troll', char: TILES.TROLL, health: 40, maxHealth: 40, attack: 8, expValue: 30, goldValue: 15, color: '#88f', minFloor: 5 },
+    { type: 'wraith', char: TILES.WRAITH, health: 35, maxHealth: 35, attack: 12, expValue: 40, goldValue: 20, color: '#c8f', minFloor: 7 },
+    { type: 'demon', char: TILES.DEMON, health: 60, maxHealth: 60, attack: 15, expValue: 50, goldValue: 30, color: '#f55', minFloor: 9 },
+    { type: 'dragon', char: TILES.DRAGON, health: 100, maxHealth: 100, attack: 20, expValue: 100, goldValue: 50, color: '#fa0', minFloor: 12 }
+];
+
+// Shop items
+const SHOP_ITEMS = [
+    { name: 'Health Boost', cost: 25, description: 'Increase max health by 15', effect: (player) => { player.maxHealth += 15; player.health += 15; } },
+    { name: 'Strength Boost', cost: 30, description: 'Increase attack power by 5', effect: (player) => { player.attackPower += 5; } },
+    { name: 'Lucky Charm', cost: 40, description: 'Increase critical hit chance by 10%', effect: (player) => { player.critChance = (player.critChance || 0) + 0.1; } },
+    { name: 'Vitality Stone', cost: 50, description: 'Gain 10% health regeneration per turn', effect: (player) => { player.healthRegen = (player.healthRegen || 0) + 0.1; } },
+    { name: 'Gold Magnet', cost: 35, description: 'Increase gold from chests by 20%', effect: (player) => { player.goldBonus = (player.goldBonus || 0) + 0.2; } },
+    { name: 'Experience Tome', cost: 45, description: 'Gain 15% more experience', effect: (player) => { player.expBonus = (player.expBonus || 0) + 0.15; } },
+    { name: 'Defensive Amulet', cost: 40, description: 'Reduce damage taken by 10%', effect: (player) => { player.damageReduction = (player.damageReduction || 0) + 0.1; } },
+    { name: 'Fury Potion', cost: 60, description: 'Gain 15% chance for double attacks', effect: (player) => { player.doubleAttackChance = (player.doubleAttackChance || 0) + 0.15; } }
 ];
 
 // Game state
@@ -32,6 +53,8 @@ const gameState = {
     currentFloor: 1,
     allMonstersDefeated: false,
     exitRevealed: false,
+    inShop: false,
+    shopItems: [],
     player: {
         x: 0,
         y: 0,
@@ -40,7 +63,14 @@ const gameState = {
         level: 1,
         experience: 0,
         experienceToLevel: 50,
-        attackPower: 10
+        attackPower: 10,
+        gold: 0,
+        critChance: 0,       // Chance to do critical damage (x2)
+        healthRegen: 0,      // Health regenerated per turn as % of max health
+        goldBonus: 0,        // Extra gold from chests
+        expBonus: 0,         // Extra experience from kills
+        damageReduction: 0,  // Reduce damage taken
+        doubleAttackChance: 0 // Chance to attack twice
     },
     monsters: [],
     map: [],
@@ -64,6 +94,7 @@ function initGame() {
     gameState.currentFloor = 1;
     gameState.allMonstersDefeated = false;
     gameState.exitRevealed = false;
+    gameState.inShop = false;
     
     // Reset player stats
     gameState.player.health = 100;
@@ -72,6 +103,13 @@ function initGame() {
     gameState.player.experience = 0;
     gameState.player.experienceToLevel = 50;
     gameState.player.attackPower = 10;
+    gameState.player.gold = 0;
+    gameState.player.critChance = 0;
+    gameState.player.healthRegen = 0;
+    gameState.player.goldBonus = 0;
+    gameState.player.expBonus = 0;
+    gameState.player.damageReduction = 0;
+    gameState.player.doubleAttackChance = 0;
     
     // Generate first level
     generateLevel();
@@ -91,12 +129,13 @@ function generateLevel() {
     gameState.monsters = [];
     gameState.allMonstersDefeated = false;
     gameState.exitRevealed = false;
+    gameState.inShop = false;
     
     // Initialize map with walls
     gameState.map = Array(MAP_HEIGHT).fill().map(() => Array(MAP_WIDTH).fill(TILES.WALL));
     
     // Generate rooms
-    const numberOfRooms = 5 + Math.floor(Math.random() * 5) + Math.floor(gameState.currentFloor / 3);
+    const numberOfRooms = 5 + Math.floor(Math.random() * 5) + Math.floor(gameState.currentFloor / 2);
     const rooms = [];
     
     for (let i = 0; i < numberOfRooms; i++) {
@@ -122,13 +161,55 @@ function generateLevel() {
         gameState.map[gameState.player.y][gameState.player.x] = TILES.FLOOR;
     }
     
-    // Add monsters based on current floor
-    const monsterCount = 3 + Math.floor(gameState.currentFloor * 1.5);
+    // Add shop on every floor starting from floor 3
+    if (gameState.currentFloor >= 3 && rooms.length > 1) {
+        // Add a shop in the second room
+        const shopRoom = rooms[1];
+        const shopX = Math.floor(shopRoom.x + shopRoom.width / 2);
+        const shopY = Math.floor(shopRoom.y + shopRoom.height / 2);
+        gameState.map[shopY][shopX] = TILES.SHOP;
+        
+        // Generate shop inventory
+        generateShopItems();
+        
+        addMessage("This floor has a shop ($). Visit it to purchase upgrades!");
+    }
+    
+    // Add monsters based on current floor and player level
+    const monsterCount = 5 + Math.floor(gameState.currentFloor * 1.5) + Math.floor(gameState.player.level * 0.5);
     addMonsters(monsterCount, rooms.slice(1)); // Skip first room
     
-    // Add chests based on floor level
-    const chestCount = 1 + Math.floor(gameState.currentFloor / 2);
+    // Add chests based on floor level and luck
+    const chestCount = 2 + Math.floor(gameState.currentFloor / 2) + Math.floor(Math.random() * 3);
     addChests(chestCount, rooms);
+}
+
+// Generate shop items for this floor
+function generateShopItems() {
+    gameState.shopItems = [];
+    
+    // Select 4 random unique items from the shop items list
+    const availableItems = [...SHOP_ITEMS];
+    const itemCount = Math.min(4, availableItems.length);
+    
+    for (let i = 0; i < itemCount; i++) {
+        // Pick random item
+        const index = Math.floor(Math.random() * availableItems.length);
+        const item = availableItems[index];
+        
+        // Remove from available items to ensure uniqueness
+        availableItems.splice(index, 1);
+        
+        // Add to shop with slightly randomized cost
+        const costVariation = 0.8 + Math.random() * 0.4; // 80% to 120% of base cost
+        const adjustedCost = Math.floor(item.cost * costVariation) * Math.ceil(gameState.currentFloor / 3);
+        
+        gameState.shopItems.push({
+            ...item,
+            cost: adjustedCost,
+            id: `shop-item-${i}`
+        });
+    }
 }
 
 // Generate a single room
@@ -244,18 +325,19 @@ function addMonsters(count, rooms) {
         
         if (foundPosition) {
             // Choose monster type based on floor level
-            const availableTypes = MONSTER_TYPES.filter(m => 
-                (m.type === 'goblin') || 
-                (m.type === 'skeleton' && gameState.currentFloor >= 2) ||
-                (m.type === 'orc' && gameState.currentFloor >= 3) ||
-                (m.type === 'troll' && gameState.currentFloor >= 5)
-            );
+            const availableTypes = MONSTER_TYPES.filter(m => m.minFloor <= gameState.currentFloor);
+            
+            if (availableTypes.length === 0) continue;
             
             const monsterTemplate = availableTypes[Math.floor(Math.random() * availableTypes.length)];
             
-            // Scale monster health and attack by floor level
-            const scalingFactor = 1 + (gameState.currentFloor - 1) * 0.2;
-            const maxHealth = Math.ceil(monsterTemplate.maxHealth * scalingFactor);
+            // Scale monster health and attack by floor level AND player level
+            const floorScaling = 1 + (gameState.currentFloor - 1) * 0.2;
+            const playerLevelScaling = 1 + (gameState.player.level - 1) * 0.15;
+            const totalScaling = floorScaling * playerLevelScaling;
+            
+            const maxHealth = Math.ceil(monsterTemplate.maxHealth * totalScaling);
+            const attack = Math.ceil(monsterTemplate.attack * totalScaling);
             
             // Add the monster
             gameState.monsters.push({
@@ -265,8 +347,9 @@ function addMonsters(count, rooms) {
                 char: monsterTemplate.char,
                 health: maxHealth,
                 maxHealth: maxHealth,
-                attack: Math.ceil(monsterTemplate.attack * scalingFactor),
-                expValue: Math.ceil(monsterTemplate.expValue * scalingFactor),
+                attack: attack,
+                expValue: Math.ceil(monsterTemplate.expValue * floorScaling),
+                goldValue: Math.ceil(monsterTemplate.goldValue * floorScaling),
                 color: monsterTemplate.color,
                 id: `monster-${Date.now()}-${i}` // Unique ID for UI updates
             });
@@ -311,7 +394,8 @@ function addChests(count, rooms) {
 function isPositionOccupied(x, y) {
     return gameState.monsters.some(m => m.x === x && m.y === y) || 
            gameState.map[y][x] === TILES.CHEST || 
-           gameState.map[y][x] === TILES.EXIT;
+           gameState.map[y][x] === TILES.EXIT ||
+           gameState.map[y][x] === TILES.SHOP;
 }
 
 // Reveal the exit after all monsters are defeated
@@ -346,6 +430,12 @@ function revealExit() {
 function drawGame() {
     if (!gameState.running) return;
     
+    // If in shop mode, draw the shop instead
+    if (gameState.inShop) {
+        drawShop();
+        return;
+    }
+    
     let display = '';
     
     // Draw each cell
@@ -359,7 +449,6 @@ function drawGame() {
             const monster = gameState.monsters.find(m => m.x === x && m.y === y);
             if (monster) {
                 char = monster.char;
-                // We'll apply monster colors through CSS, but could use inline style too
             }
             
             // Check for player
@@ -367,11 +456,13 @@ function drawGame() {
                 char = TILES.PLAYER;
             }
             
-            // Add animations for chests and exit
+            // Add animations for chests, shop, and exit
             if (char === TILES.CHEST) {
                 extraClasses = ' chest-animated';
             } else if (char === TILES.EXIT) {
                 extraClasses = ' exit-animated';
+            } else if (char === TILES.SHOP) {
+                extraClasses = ' shop-animated';
             }
             
             // Apply color based on tile type
@@ -388,6 +479,8 @@ function drawGame() {
                 colorClass = ' style="color:#ffcc00"';
             } else if (char === TILES.EXIT) {
                 colorClass = ' style="color:#00ff00"';
+            } else if (char === TILES.SHOP) {
+                colorClass = ' style="color:#ff55ff"';
             }
             
             // Add span with styling
@@ -400,12 +493,40 @@ function drawGame() {
     gameDisplay.innerHTML = display;
 }
 
+// Draw the shop interface
+function drawShop() {
+    let display = '';
+    
+    // Shop header
+    display += '<div class="shop-interface">';
+    display += '<h2 class="shop-title">SHOP</h2>';
+    display += `<p>Your Gold: ${gameState.player.gold} coins</p>`;
+    display += '<div class="shop-items">';
+    
+    // Shop items
+    gameState.shopItems.forEach((item, index) => {
+        const canAfford = gameState.player.gold >= item.cost;
+        display += `<div class="shop-item ${canAfford ? '' : 'cannot-afford'}" data-id="${item.id}">`;
+        display += `<div class="shop-item-name">${index + 1}. ${item.name}</div>`;
+        display += `<div class="shop-item-desc">${item.description}</div>`;
+        display += `<div class="shop-item-cost">${item.cost} gold</div>`;
+        display += '</div>';
+    });
+    
+    display += '</div>';
+    display += '<p class="shop-help">Press 1-4 to purchase an item, or ESC to exit shop</p>';
+    display += '</div>';
+    
+    // Update the game display
+    gameDisplay.innerHTML = display;
+}
+
 // Update stat displays
 function updateStats() {
     healthValue.textContent = gameState.player.health;
     levelValue.textContent = gameState.player.level;
     expValue.textContent = `${gameState.player.experience}/${gameState.player.experienceToLevel}`;
-    floorValue.textContent = gameState.currentFloor;
+    floorValue.textContent = `${gameState.currentFloor} | Gold: ${gameState.player.gold}`;
 }
 
 // Update monster list in UI
@@ -442,6 +563,9 @@ function updateMonsterList() {
 function movePlayer(dx, dy) {
     if (!gameState.running) return;
     
+    // If in shop, don't move
+    if (gameState.inShop) return;
+    
     const newX = gameState.player.x + dx;
     const newY = gameState.player.y + dy;
     
@@ -475,9 +599,24 @@ function movePlayer(dx, dy) {
         return;
     }
     
+    // Check for shop
+    if (gameState.map[newY][newX] === TILES.SHOP) {
+        enterShop();
+        return;
+    }
+    
     // Move player
     gameState.player.x = newX;
     gameState.player.y = newY;
+    
+    // Apply health regeneration if player has it
+    if (gameState.player.healthRegen > 0) {
+        const regenAmount = Math.floor(gameState.player.maxHealth * gameState.player.healthRegen / 10);
+        if (regenAmount > 0 && gameState.player.health < gameState.player.maxHealth) {
+            gameState.player.health = Math.min(gameState.player.health + regenAmount, gameState.player.maxHealth);
+            updateStats();
+        }
+    }
     
     // Move monsters after player moves
     moveMonsters();
@@ -486,24 +625,78 @@ function movePlayer(dx, dy) {
     drawGame();
 }
 
+// Enter shop
+function enterShop() {
+    gameState.inShop = true;
+    addMessage("Welcome to the shop! Press 1-4 to purchase items, ESC to exit.");
+    drawShop();
+}
+
+// Exit shop
+function exitShop() {
+    gameState.inShop = false;
+    addMessage("You left the shop.");
+    drawGame();
+}
+
+// Buy item from shop
+function buyItem(index) {
+    if (index < 0 || index >= gameState.shopItems.length) return;
+    
+    const item = gameState.shopItems[index];
+    
+    if (gameState.player.gold >= item.cost) {
+        gameState.player.gold -= item.cost;
+        item.effect(gameState.player);
+        
+        addMessage(`Purchased ${item.name}! ${item.description}`);
+        
+        // Remove the item so it can't be purchased again
+        gameState.shopItems.splice(index, 1);
+        
+        // Update UI
+        updateStats();
+        drawShop();
+    } else {
+        addMessage("Not enough gold!");
+    }
+}
+
 // Player attacks monster
 function attackMonster(monsterIndex) {
     const monster = gameState.monsters[monsterIndex];
     
     // Calculate damage with some randomness
-    const damage = Math.max(1, Math.floor(gameState.player.attackPower * (0.8 + Math.random() * 0.4)));
+    const baseDamage = Math.floor(gameState.player.attackPower * (0.8 + Math.random() * 0.4));
+    
+    // Check for critical hit
+    const isCritical = Math.random() < gameState.player.critChance;
+    const damage = isCritical ? baseDamage * 2 : baseDamage;
     
     // Apply damage
     monster.health -= damage;
     
     // Show message
-    addMessage(`You hit the ${monster.type} for ${damage} damage!`);
+    addMessage(`You hit the ${monster.type} for ${damage} damage!${isCritical ? ' CRITICAL HIT!' : ''}`);
+    
+    // Check for double attack
+    if (Math.random() < gameState.player.doubleAttackChance && monster.health > 0) {
+        const secondDamage = Math.floor(gameState.player.attackPower * (0.7 + Math.random() * 0.3));
+        monster.health -= secondDamage;
+        addMessage(`You strike again for ${secondDamage} damage!`);
+    }
     
     // Check if monster is defeated
     if (monster.health <= 0) {
-        // Give experience
-        gameState.player.experience += monster.expValue;
-        addMessage(`You defeated the ${monster.type}! +${monster.expValue} XP`);
+        // Calculate experience with bonus if applicable
+        const expGain = Math.ceil(monster.expValue * (1 + gameState.player.expBonus));
+        gameState.player.experience += expGain;
+        
+        // Calculate gold drop
+        const goldGain = monster.goldValue;
+        gameState.player.gold += goldGain;
+        
+        addMessage(`You defeated the ${monster.type}! +${expGain} XP, +${goldGain} gold`);
         
         // Remove monster
         gameState.monsters.splice(monsterIndex, 1);
@@ -530,13 +723,16 @@ function attackMonster(monsterIndex) {
 // Monster attacks player
 function monsterAttack(monster) {
     // Calculate damage
-    const damage = Math.max(1, Math.floor(monster.attack * (0.8 + Math.random() * 0.4)));
+    const baseDamage = Math.max(1, Math.floor(monster.attack * (0.8 + Math.random() * 0.4)));
+    
+    // Apply damage reduction if player has it
+    const reducedDamage = Math.max(1, Math.floor(baseDamage * (1 - gameState.player.damageReduction)));
     
     // Apply damage
-    gameState.player.health -= damage;
+    gameState.player.health -= reducedDamage;
     
     // Show message
-    addMessage(`${monster.type} hits you for ${damage} damage!`);
+    addMessage(`${monster.type} hits you for ${reducedDamage} damage!`);
     
     // Check if player is defeated
     if (gameState.player.health <= 0) {
@@ -568,15 +764,23 @@ function checkLevelUp() {
 
 // Open a chest
 function openChest(x, y) {
-    // Calculate XP based on floor level
-    const xpGain = 10 + Math.floor(Math.random() * 10) * gameState.currentFloor;
+    // Calculate gold based on floor level and luck
+    const baseGold = 5 + Math.floor(Math.random() * 10) * gameState.currentFloor;
+    const goldGain = Math.ceil(baseGold * (1 + gameState.player.goldBonus));
     
-    // Give experience
-    gameState.player.experience += xpGain;
-    addMessage(`You found a treasure chest! +${xpGain} XP`);
+    // Give gold
+    gameState.player.gold += goldGain;
+    addMessage(`You found a treasure chest! +${goldGain} gold`);
     
-    // Check for level up
-    checkLevelUp();
+    // Small chance to also find experience
+    if (Math.random() < 0.3) {
+        const xpGain = 5 + Math.floor(Math.random() * 5) * gameState.currentFloor;
+        gameState.player.experience += xpGain;
+        addMessage(`The chest contained ancient knowledge! +${xpGain} XP`);
+        
+        // Check for level up
+        checkLevelUp();
+    }
     
     // Remove chest from map
     gameState.map[y][x] = TILES.FLOOR;
@@ -657,10 +861,35 @@ startButton.addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
     if (!gameState.running) return;
     
+    // Shop controls
+    if (gameState.inShop) {
+        switch (e.key) {
+            case 'Escape':
+                exitShop();
+                break;
+            case '1':
+                buyItem(0);
+                break;
+            case '2':
+                buyItem(1);
+                break;
+            case '3':
+                buyItem(2);
+                break;
+            case '4':
+                buyItem(3);
+                break;
+        }
+        return;
+    }
+    
+    // Movement and regular controls
     switch (e.key) {
         case 'ArrowUp':
         case 'w':
         case 'W':
+        case 'z':
+        case 'Z':
             movePlayer(0, -1);
             break;
         case 'ArrowDown':
@@ -671,6 +900,8 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowLeft':
         case 'a':
         case 'A':
+        case 'q':
+        case 'Q':
             movePlayer(-1, 0);
             break;
         case 'ArrowRight':
