@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Roguelike</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="game-container">
+        <header>
+            <h1>ASCII Roguelike Adventure</h1>
+        </header>
+        
+        <div class="game-wrapper">
+            <div class="game-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Health:</span>
+                    <span id="health-value">100</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Level:</span>
+                    <span id="level-value">1</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Experience:</span>
+                    <span id="exp-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Dungeon Floor:</span>
+                    <span id="floor-value">1</span>
+                </div>
+            </div>
+            
+            <div class="game-content">
+                <div class="game-area">
+                    <pre id="game-display"></pre>
+                </div>
+                
+                <div class="monster-scoreboard">
+                    <h3>Monsters</h3>
+                    <div id="monster-list"></div>
+                </div>
+            </div>
+            
+            <div class="game-controls">
+                <div class="control-info">
+                    <p>Use WASD or Arrow keys to move</p>
+                    <p>Space to wait a turn</p>
+                </div>
+                <button id="start-button" class="btn">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="game-message">
+            <p id="message-text">Welcome to ASCII Roguelike Adventure! Press Start to begin.</p>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+</body>
+</html>
