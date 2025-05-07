@@ -15,23 +15,20 @@ const gameState = {
         maxHealth: 100,
         level: 1,
         experience: 0,
-        experienceToLevel: 100,
+        experienceToLevel: 50,
         attackPower: 10,
         gold: 0,
-        critChance: 0.05,       // Base 5% chance
-        healthRegen: 0,         // Health regenerated per turn as % of max health
-        goldBonus: 0,           // Extra gold from chests
-        expBonus: 0,            // Extra experience from kills
-        damageReduction: 0,     // Reduce damage taken
-        doubleAttackChance: 0,  // Chance to attack twice
-        potions: [],            // Potions inventory
-        maxPotions: 5,          // Maximum potions that can be carried
-        temporaryEffects: {}    // Temporary effects from potions
+        critChance: 0,       // Chance to do critical damage (x2)
+        healthRegen: 0,      // Health regenerated per turn as % of max health
+        goldBonus: 0,        // Extra gold from chests
+        expBonus: 0,         // Extra experience from kills
+        damageReduction: 0,  // Reduce damage taken
+        doubleAttackChance: 0, // Chance to attack twice
+        potions: []          // Potion inventory
     },
     monsters: [],
     map: [],
-    messages: [],
-    selectedPotion: -1 // Index of the selected potion in the inventory
+    messages: []
 };
 
 // DOM Elements
@@ -43,6 +40,7 @@ const expValue = document.getElementById('exp-value');
 const floorValue = document.getElementById('floor-value');
 const messageText = document.getElementById('message-text');
 const monsterList = document.getElementById('monster-list');
+const potionList = document.getElementById('potion-list');
 
 // Initialize the game
 function initGame() {
@@ -51,212 +49,41 @@ function initGame() {
     gameState.allMonstersDefeated = false;
     gameState.exitRevealed = false;
     gameState.inShop = false;
-    gameState.selectedPotion = -1;
     
     // Reset player stats
-    gameState.player.x = 40;
-    gameState.player.y = 12;
     gameState.player.health = 100;
     gameState.player.maxHealth = 100;
     gameState.player.level = 1;
     gameState.player.experience = 0;
-    gameState.player.experienceToLevel = 100;
+    gameState.player.experienceToLevel = 50;
     gameState.player.attackPower = 10;
     gameState.player.gold = 0;
-    gameState.player.critChance = 0.05;
+    gameState.player.critChance = 0;
     gameState.player.healthRegen = 0;
     gameState.player.goldBonus = 0;
     gameState.player.expBonus = 0;
     gameState.player.damageReduction = 0;
     gameState.player.doubleAttackChance = 0;
-    gameState.player.potions = []; // Empty potions inventory
-    gameState.player.temporaryEffects = {}; // Reset temporary effects
+    gameState.player.potions = [];
     
-    // Reset game state
-    gameState.messages = [];
-    gameState.currentFloor = 1;
-    gameState.allMonstersDefeated = false;
-
     // Generate first level
     generateLevel();
     
     // Update UI
     updateStats();
     updateMonsterList();
-    setupPotionInventory();
+    updatePotionList();
     addMessage('Game started! Explore the dungeon and defeat all monsters to find the exit.');
     
     // Start game loop
     drawGame();
 }
 
-// Function to add a potion to the player's inventory
-function addPotion(potionData) {
-    // Check if inventory is full
-    if (gameState.player.potions.length >= gameState.player.maxPotions) {
-        addMessage("Your potion pocket is full!");
-        return false;
-    }
-    
-    // Add potion to inventory
-    gameState.player.potions.push({
-        id: potionData.id,
-        name: potionData.name,
-        description: potionData.description,
-        effect: potionData.effect,
-        amount: potionData.amount,
-        color: potionData.color,
-        duration: potionData.duration || 0
-    });
-    
-    // Update the potion display
-    updatePotionDisplay();
-    return true;
-}
-
-// Use a potion from the inventory
-function usePotion(index) {
-    if (index < 0 || index >= gameState.player.potions.length) return;
-    
-    // Get the potion
-    const potion = gameState.player.potions[index];
-    let used = false;
-    
-    // Apply potion effect
-    switch (potion.effect) {
-        case 'restore_health':
-            const healAmount = Math.floor(gameState.player.maxHealth * potion.amount);
-            gameState.player.health = Math.min(gameState.player.health + healAmount, gameState.player.maxHealth);
-            addMessage(`You drink ${potion.name} and heal for ${healAmount} health!`);
-            used = true;
-            break;
-            
-        case 'restore_exp':
-            const expAmount = Math.floor(gameState.player.experienceToLevel * potion.amount);
-            gameState.player.experience += expAmount;
-            addMessage(`You drink ${potion.name} and gain ${expAmount} experience!`);
-            checkLevelUp();
-            used = true;
-            break;
-            
-        case 'temp_attack':
-            // Apply temporary attack boost
-            gameState.player.temporaryEffects.attackBoost = {
-                amount: potion.amount,
-                turnsLeft: potion.duration
-            };
-            addMessage(`You drink ${potion.name} and feel stronger for ${potion.duration} turns!`);
-            used = true;
-            break;
-            
-        case 'temp_protection':
-            // Apply temporary protection
-            gameState.player.temporaryEffects.damageReduction = {
-                amount: potion.amount,
-                turnsLeft: potion.duration
-            };
-            addMessage(`You drink ${potion.name} and feel protected for ${potion.duration} turns!`);
-            used = true;
-            break;
-    }
-    
-    // If potion was used successfully, remove it from inventory
-    if (used) {
-        gameState.player.potions.splice(index, 1);
-        updatePotionDisplay();
-        updateStats();
-    }
-}
-
-// Process temporary potion effects each turn
-function processPotionEffects() {
-    const effects = gameState.player.temporaryEffects;
-    
-    // Process each active effect
-    for (const effectType in effects) {
-        if (effects.hasOwnProperty(effectType)) {
-            const effect = effects[effectType];
-            
-            // Decrease turns left
-            effect.turnsLeft--;
-            
-            // Remove effect if turns left is zero
-            if (effect.turnsLeft <= 0) {
-                addMessage(`Your ${effectType} potion effect has worn off.`);
-                delete effects[effectType];
-            }
-        }
-    }
-}
-
-// Initialize the potion inventory display
-function setupPotionInventory() {
-    const gameContainer = document.getElementById('gameContainer');
-    
-    // Create potion pocket container if it doesn't exist
-    let potionContainer = document.getElementById('potionPocket');
-    if (!potionContainer) {
-        potionContainer = document.createElement('div');
-        potionContainer.id = 'potionPocket';
-        potionContainer.className = 'potion-pocket';
-        potionContainer.innerHTML = `<h3>Potion Pocket</h3><div id="potionSlots"></div>`;
-        gameContainer.appendChild(potionContainer);
-    }
-    
-    updatePotionDisplay();
-}
-
-// Update the potion display
-function updatePotionDisplay() {
-    const potionSlots = document.getElementById('potionSlots');
-    potionSlots.innerHTML = '';
-    
-    // Add potion slots
-    for (let i = 0; i < gameState.player.maxPotions; i++) {
-        const slotDiv = document.createElement('div');
-        slotDiv.className = 'potion-slot';
-        
-        // If there's a potion in this slot
-        if (i < gameState.player.potions.length) {
-            const potion = gameState.player.potions[i];
-            slotDiv.innerHTML = `
-                <div class="potion" style="background-color: ${potion.color}"></div>
-                <div class="potion-label">${i+1}: ${potion.name}</div>
-                <div class="potion-tooltip">${potion.description}</div>
-            `;
-            slotDiv.addEventListener('click', () => usePotion(i));
-        } else {
-            slotDiv.innerHTML = `<div class="empty-slot">${i+1}</div>`;
-        }
-        
-        potionSlots.appendChild(slotDiv);
-    }
-}
-
 // Game over
 function gameOver() {
     gameState.running = false;
     addMessage('Game Over! You have been defeated.');
-    addMessage(`You reached floor ${gameState.currentFloor} and were level ${gameState.player.level}.`);
     startButton.textContent = 'Play Again';
-    
-    // Show game over screen
-    const gameContainer = document.getElementById('gameContainer');
-    const gameOverDiv = document.createElement('div');
-    gameOverDiv.className = 'game-over';
-    gameOverDiv.innerHTML = `
-        <h2>Game Over!</h2>
-        <p>You reached floor ${gameState.currentFloor}</p>
-        <p>You were level ${gameState.player.level}</p>
-        <button id="restartButton">Play Again</button>
-    `;
-    gameContainer.appendChild(gameOverDiv);
-    
-    // Set up restart button
-    document.getElementById('restartButton').addEventListener('click', function() {
-        gameContainer.removeChild(gameOverDiv);
-        initGame();
-    });
 }
 
 // Event listeners
@@ -291,22 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // Potion selection (number keys 1-5)
-        if (e.key >= '1' && e.key <= '5') {
+        // Potion use (keys 1-5)
+        if (e.key >= "1" && e.key <= "5") {
             const potionIndex = parseInt(e.key) - 1;
-            if (potionIndex < gameState.player.potions.length) {
-                usePotion(potionIndex);
-            }
-            return;
-        }
-        
-        // Use selected potion with 'U' key
-        if (e.key === 'u' || e.key === 'U') {
-            if (gameState.selectedPotion >= 0) {
-                usePotion(gameState.selectedPotion);
-            } else {
-                addMessage("No potion selected. Press a number key (1-5) to use a potion.");
-            }
+            usePotion(potionIndex);
             return;
         }
         
@@ -343,7 +158,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     });
+    
+    // Add click event listeners for potions
+    document.addEventListener('click', (e) => {
+        if (!gameState.running) return;
+        
+        // Check if a potion was clicked
+        if (e.target.closest('.potion-item')) {
+            const potionElement = e.target.closest('.potion-item');
+            const potionIndex = parseInt(potionElement.dataset.index);
+            usePotion(potionIndex);
+        }
+    });
 });
+
+// Use potion at given index
+function usePotion(index) {
+    if (index < 0 || index >= gameState.player.potions.length) return;
+    
+    const potion = gameState.player.potions[index];
+    const result = potion.effect(gameState.player);
+    
+    addMessage(`Used ${potion.name}! ${result}`);
+    
+    // Remove used potion
+    gameState.player.potions.splice(index, 1);
+    
+    // Update UI
+    updatePotionList();
+    updateStats();
+    checkLevelUp();
+}
 
 // Initial message
 addMessage('Welcome to ASCII Roguelike Adventure! Press Start to begin.');

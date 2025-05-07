@@ -239,58 +239,6 @@ function addChests(count, rooms) {
     }
 }
 
-// Open a chest
-function openChest(x, y) {
-    // Replace the chest tile with a floor tile
-    gameState.map[y][x] = TILES.FLOOR;
-    
-    // Calculate gold found based on floor level (with bonus if player has goldBonus)
-    const baseGold = Math.floor(10 + (gameState.currentFloor * 5) * (1 + Math.random()));
-    const goldAmount = Math.floor(baseGold * (1 + gameState.player.goldBonus));
-    gameState.player.gold += goldAmount;
-    
-    addMessage(`You found ${goldAmount} gold in the chest!`);
-    
-    // Chance to find a potion, increasing with floor level
-    const potionChance = 0.4 + (gameState.currentFloor * 0.05);
-    if (Math.random() < potionChance) {
-        // Get potions that can appear on this floor
-        const availablePotions = POTION_TYPES.filter(
-            p => !p.minFloor || p.minFloor <= gameState.currentFloor
-        );
-        
-        if (availablePotions.length > 0) {
-            // Weight potions by rarity
-            const raritySum = availablePotions.reduce((sum, p) => sum + (5 - p.rarity), 0);
-            let roll = Math.random() * raritySum;
-            
-            let selectedPotion = availablePotions[0];
-            for (const potion of availablePotions) {
-                const rarityWeight = 5 - potion.rarity;
-                if (roll < rarityWeight) {
-                    selectedPotion = potion;
-                    break;
-                }
-                roll -= rarityWeight;
-            }
-            
-            // Add the potion to inventory
-            if (addPotion(selectedPotion)) {
-                addMessage(`You found a ${selectedPotion.name} in the chest!`);
-            } else {
-                // If inventory is full, give some gold instead
-                const extraGold = Math.floor(baseGold / 2);
-                gameState.player.gold += extraGold;
-                addMessage(`You found a ${selectedPotion.name} but your potion pocket is full! You take ${extraGold} gold instead.`);
-            }
-        }
-    }
-    
-    // Update UI
-    updateStats();
-    drawGame();
-}
-
 // Check if a position is occupied by a monster
 function isPositionOccupied(x, y) {
     return gameState.monsters.some(m => m.x === x && m.y === y) || 

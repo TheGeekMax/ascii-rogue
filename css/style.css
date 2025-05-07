@@ -81,6 +81,59 @@ h1 {
     padding: 5px;
 }
 
+/* Potion pocket styling */
+.potion-pocket {
+    flex: 1;
+    background-color: #272727;
+    padding: 15px;
+    border-radius: 5px;
+    max-width: 200px;
+}
+
+.potion-pocket h3 {
+    color: #ff9900;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.potion-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    background-color: #333;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.potion-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.potion-icon {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
+.no-potions {
+    color: #aaa;
+    font-style: italic;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.usage-hint {
+    color: #999;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 15px;
+    font-style: italic;
+}
+
 #game-display {
     font-family: 'Courier New', monospace;
     font-size: 16px;
